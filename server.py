@@ -1041,6 +1041,35 @@ def test_alert():
     except Exception as e:
         return f"Error: {e}", 500
 
+@app.route("/api/journal")
+def api_journal():
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    journal_path = os.path.join(data_dir, "live_trade_journal.csv")
+    history_path = os.path.join(data_dir, "live_scan_history.csv")
+    
+    trades = []
+    if os.path.exists(journal_path):
+        try:
+            df_j = pd.read_csv(journal_path)
+            trades = df_j.to_dict(orient="records")
+        except Exception:
+            pass
+
+    recent_scans = []
+    if os.path.exists(history_path):
+        try:
+            df_h = pd.read_csv(history_path)
+            recent_scans = df_h.tail(20).to_dict(orient="records")
+        except Exception:
+            pass
+
+    return jsonify({
+        "success": True,
+        "total_trades_logged": len(trades),
+        "trades": trades,
+        "recent_scans": recent_scans
+    }), 200
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)

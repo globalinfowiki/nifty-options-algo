@@ -81,6 +81,20 @@ class LiveSignalScanner:
 
         print(f"[Scanner {datetime.now().strftime('%H:%M:%S')}] Candle: {candle_time} | Spot: {spot_price:.2f} | 15m: {trend_15m} | KER: {ker:.2f} | Signal: {signal}")
 
+        # Persistent Logging: Record every scan into daily audit CSV
+        try:
+            import os
+            data_dir = os.path.join(os.path.dirname(__file__), "data")
+            os.makedirs(data_dir, exist_ok=True)
+            log_path = os.path.join(data_dir, "live_scan_history.csv")
+            is_new = not os.path.exists(log_path)
+            with open(log_path, "a", encoding="utf-8") as f:
+                if is_new:
+                    f.write("timestamp,candle_time,spot,trend_15m,ker,orb_high,orb_low,signal\n")
+                f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')},{candle_time},{spot_price:.2f},{trend_15m},{ker:.2f},{orb_high:.2f},{orb_low:.2f},{signal}\n")
+        except Exception as e_log:
+            print(f"[Log Error] {e_log}")
+
         trade_info = None
         if signal in [1, -1] and atr > 0:
             option_type = "CE" if signal == 1 else "PE"
@@ -108,6 +122,17 @@ class LiveSignalScanner:
                 sl_pts=sl_pts,
                 target_pts=target_pts
             )
+
+            # Persistent Logging: Record trade into live trade journal CSV
+            try:
+                journal_path = os.path.join(data_dir, "live_trade_journal.csv")
+                is_new_j = not os.path.exists(journal_path)
+                with open(journal_path, "a", encoding="utf-8") as f_j:
+                    if is_new_j:
+                        f_j.write("timestamp,candle_time,type,strike,spot,entry_price,sl_price,target_price,qty,reason\n")
+                    f_j.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')},{candle_time},{option_type},{strike},{spot_price:.2f},{entry_price:.2f},{sl_price:.2f},{target_price:.2f},{self.config.LOT_SIZE},{reason}\n")
+            except Exception as e_j:
+                print(f"[Journal Error] {e_j}")
 
             self.today_trades_done += 1
             trade_info = {
