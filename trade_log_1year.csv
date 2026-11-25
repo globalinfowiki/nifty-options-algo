@@ -1,0 +1,2 @@
+entry_time,type,strike,entry_spot,entry_premium,qty,delta,sl_spot,target_spot,initial_risk_pts,trailed_to_be,bars_held,exit_time,exit_spot,exit_premium,gross_pnl,costs,net_pnl,exit_reason,capital_after
+2026-08-19 10:15:00+05:30,PE,24050,24048.5,198.32,25,0.52,24100.48,23944.54,51.978515625,False,5,2026-08-19 15:15:00+05:30,24078.30078125,181.4,-423.04,52.0,-475.04,Intraday Square-off (15:10),4524.96
