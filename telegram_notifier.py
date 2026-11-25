@@ -47,9 +47,13 @@ class AlertNotifier:
         except Exception:
             return False
 
-    def notify_entry_signal(self, symbol, option_type, strike, entry_price, sl_price, target_price, qty=25, reason=""):
-        risk_per_lot = round((entry_price - sl_price) * qty, 2)
-        reward_per_lot = round((target_price - entry_price) * qty, 2)
+    def notify_entry_signal(self, symbol, option_type, strike, entry_price, sl_price, target_price, qty=25, reason="", sl_pts=None, target_pts=None):
+        if sl_pts is None:
+            sl_pts = round(entry_price - sl_price, 1)
+        if target_pts is None:
+            target_pts = round(target_price - entry_price, 1)
+        risk_per_lot = round(sl_pts * qty, 2)
+        reward_per_lot = round(target_pts * qty, 2)
         now_str = datetime.now().strftime("%I:%M %p | %d-%b-%Y")
 
         # 1. Play Audio Alarm
@@ -64,9 +68,9 @@ class AlertNotifier:
 ║  📌 Action      : BUY {option_type:<41} ║
 ║  🎯 Strike      : {symbol} {strike} {option_type:<32} ║
 ║  📦 Quantity    : {qty} Qty (1 Lot Strictly)                           ║
-║  💵 Entry Price : ₹{entry_price:<44.2f} ║
-║  🛑 Stop-Loss   : ₹{sl_price:<7.2f} (Max Risk: ₹{risk_per_lot:<20.2f}) ║
-║  🎯 Target 1:2  : ₹{target_price:<7.2f} (Potential Reward: ₹{reward_per_lot:<12.2f}) ║
+║  💵 Est. Price  : ₹{entry_price:<44.2f} ║
+║  🛑 Stop-Loss   : ₹{sl_price:<7.2f} (-{sl_pts:.1f} pts | Risk: ₹{risk_per_lot:<12.2f}) ║
+║  🎯 Target 1:2  : ₹{target_price:<7.2f} (+{target_pts:.1f} pts | Gain: ₹{reward_per_lot:<12.2f}) ║
 ║  ⏳ Time Stop   : 75 Mins (Theta Protection Exit)                    ║
 ║  📊 Setup Rule  : {reason:<46} ║
 ╚══════════════════════════════════════════════════════════════════════╝
@@ -80,11 +84,12 @@ class AlertNotifier:
             f"📌 *Action:* BUY `{option_type}`\n"
             f"🎯 *Strike:* `{symbol} {strike} {option_type}`\n"
             f"📦 *Quantity:* `{qty} (1 Lot)`\n"
-            f"💵 *Entry:* `₹{entry_price:.2f}`\n"
-            f"🛑 *Stop-Loss:* `₹{sl_price:.2f}` _(Risk: ₹{risk_per_lot:.0f})_\n"
-            f"🎯 *Target (1:2):* `₹{target_price:.2f}` _(Reward: ₹{reward_per_lot:.0f})_\n"
+            f"💵 *Est. Entry:* `₹{entry_price:.2f}`\n"
+            f"🛑 *Stop-Loss:* `₹{sl_price:.2f}` _(-{sl_pts:.1f} pts | Risk: ₹{risk_per_lot:.0f})_\n"
+            f"🎯 *Target (1:2):* `₹{target_price:.2f}` _(+{target_pts:.1f} pts | Reward: ₹{reward_per_lot:.0f})_\n"
             f"⏳ *Theta Limit:* 75 Mins\n"
             f"📊 *Reason:* {reason}\n"
+            f"💡 *Groww Rule:* Punch in Groww, set SL at -{sl_pts:.0f} pts & Target at +{target_pts:.0f} pts from your fill price\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"⏰ _{now_str}_"
         )

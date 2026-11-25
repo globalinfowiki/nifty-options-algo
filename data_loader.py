@@ -17,7 +17,7 @@ class MarketDataLoader:
         }
         self.ticker_symbol = self.symbol_map.get(instrument, "^NSEI")
 
-    def fetch_data(self, period="60d", interval="5m", cache_file=None):
+    def fetch_data(self, period="60d", interval="5m", cache_file=None, allow_synthetic=False):
         """
         Fetches intraday data. yfinance allows up to 60 days of 5m intraday data.
         For 1-year historical testing, daily or aggregated resampled data can also be evaluated.
@@ -59,8 +59,12 @@ class MarketDataLoader:
 
             return df
         except Exception as e:
-            print(f"[Data Error] Failed to fetch data: {e}. Generating high-fidelity synthetic Nifty data for testing.")
-            return self.generate_synthetic_intraday_data()
+            if allow_synthetic:
+                print(f"[Data Error] Failed to fetch data: {e}. Generating high-fidelity synthetic Nifty data for testing.")
+                return self.generate_synthetic_intraday_data()
+            else:
+                print(f"[Data Error] Live data fetch failed: {e}. Returning empty dataset to protect against false live signals.")
+                return pd.DataFrame()
 
     def generate_synthetic_intraday_data(self, days=60):
         """

@@ -79,7 +79,9 @@ class LiveSignalScanner:
                 sl_price=sl_price,
                 target_price=target_price,
                 qty=self.config.LOT_SIZE,
-                reason=reason
+                reason=reason,
+                sl_pts=sl_pts,
+                target_pts=target_pts
             )
 
             self.today_trades_done += 1

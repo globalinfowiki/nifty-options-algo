@@ -82,9 +82,26 @@ def background_scanner_thread():
         # Sleep for 60 seconds before next check
         time.sleep(60)
 
-# Start background scanner thread on startup
-worker_thread = threading.Thread(target=background_scanner_thread, daemon=True)
-worker_thread.start()
+import socket
+
+# Ensure singleton background worker even if Gunicorn spawns multiple workers
+_worker_socket_lock = None
+def acquire_worker_lock():
+    global _worker_socket_lock
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", 19899))
+        _worker_socket_lock = s
+        return True
+    except Exception:
+        return False
+
+if acquire_worker_lock():
+    worker_thread = threading.Thread(target=background_scanner_thread, daemon=True)
+    worker_thread.start()
+    print("[Server] Background scanner worker started on Leader process.")
+else:
+    print("[Server] Secondary worker active; background scanner delegated to Leader.")
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>

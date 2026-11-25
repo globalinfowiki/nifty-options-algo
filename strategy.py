@@ -134,13 +134,19 @@ class MomentumOptionStrategy:
         # 2. Friday Weekend Theta Protection: Avoid entering late on Friday after 13:30
         friday_filter = ~((df['DayOfWeek'] == 4) & (times >= pd.to_datetime('13:30').time()))
 
+        # 3. Thursday Expiry Afternoon Shield: Avoid entering late on Expiry afternoon after 13:30 (extreme gamma/theta decay)
+        thursday_filter = ~((df['DayOfWeek'] == 3) & (times >= pd.to_datetime('13:30').time()))
+
+        # Combined weekday safety filter
+        expiry_theta_filter = friday_filter & thursday_filter
+
         # CE Setup (Institutional High-Conviction):
         ce_breakout = (df['Close'] > df['ORB_High']) & (df['Close'].shift(1) <= df['ORB_High'])
-        ce_filter = (df['Trend_15M'] == 1) & (df['SuperTrend_Direction'] == 1) & (df['KER'] > 0.38) & normal_gap & friday_filter & valid_time
+        ce_filter = (df['Trend_15M'] == 1) & (df['SuperTrend_Direction'] == 1) & (df['KER'] > 0.38) & normal_gap & expiry_theta_filter & valid_time
 
         # PE Setup (Institutional High-Conviction):
         pe_breakdown = (df['Close'] < df['ORB_Low']) & (df['Close'].shift(1) >= df['ORB_Low'])
-        pe_filter = (df['Trend_15M'] == -1) & (df['SuperTrend_Direction'] == -1) & (df['KER'] > 0.38) & normal_gap & friday_filter & valid_time
+        pe_filter = (df['Trend_15M'] == -1) & (df['SuperTrend_Direction'] == -1) & (df['KER'] > 0.38) & normal_gap & expiry_theta_filter & valid_time
 
         df.loc[ce_breakout & ce_filter, 'Signal'] = 1
         df.loc[pe_breakdown & pe_filter, 'Signal'] = -1
