@@ -72,15 +72,20 @@ def background_scanner_thread():
             market_open = is_market_open_now()
             scanner_status["is_market_open"] = market_open
 
-            if market_open and scanner:
-                print(f"[Worker] Scanning market at {now_ist.strftime('%H:%M:%S IST')}...")
-                result = scanner.scan_once()
-                scanner_status["last_scan_ist"] = now_ist.strftime("%d-%b-%Y %I:%M:%S %p")
+            if scanner:
+                print(f"[Worker] Checking market (Open: {market_open}) at {now_ist.strftime('%H:%M:%S IST')}...")
+                scan_res = scanner.scan_once()
+                if scan_res:
+                    scanner_status["last_spot"] = scan_res.get("spot", scanner_status["last_spot"])
+                    scanner_status["last_ker"] = scan_res.get("ker", scanner_status["last_ker"])
+                    scanner_status["trend_15m"] = scan_res.get("trend_15m", scanner_status["trend_15m"])
+                    scanner_status["orb_high"] = scan_res.get("orb_high", scanner_status["orb_high"])
+                    scanner_status["orb_low"] = scan_res.get("orb_low", scanner_status["orb_low"])
+                    if scan_res.get("trade"):
+                        scanner_status["last_signal"] = scan_res["trade"]
+
+                scanner_status["last_scan_ist"] = now_ist.strftime("%d-%b-%Y %I:%M:%S %p") + ("" if market_open else " (Market Closed)")
                 scanner_status["today_trades"] = scanner.today_trades_done
-                if result:
-                    scanner_status["last_signal"] = result
-            else:
-                scanner_status["last_scan_ist"] = now_ist.strftime("%d-%b-%Y %I:%M:%S %p (Market Closed)")
 
         except Exception as e:
             print(f"[Worker Scan Exception] {e}")
@@ -534,6 +539,27 @@ DASHBOARD_HTML = """
                     <div class="panel-title" style="font-size: 14px;">📡 Live Cloud Scanner Status</div>
                     <span class="mono" style="font-size: 11px; color: var(--text-muted);" id="lastScanVal">{{ last_scan_ist }}</span>
                 </div>
+
+                <!-- LIVE MARKET REAL-TIME METRICS -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; text-align: left;">
+                    <div style="background: #090d16; padding: 10px; border-radius: 6px; border: 1px solid #1e293b;">
+                        <span style="font-size: 10px; color: var(--text-muted); display: block; font-weight: 600;">NIFTY 50 SPOT</span>
+                        <strong class="mono" id="liveSpotVal" style="font-size: 15px; color: #38bdf8;">₹{{ last_spot }}</strong>
+                    </div>
+                    <div style="background: #090d16; padding: 10px; border-radius: 6px; border: 1px solid #1e293b;">
+                        <span style="font-size: 10px; color: var(--text-muted); display: block; font-weight: 600;">15M TREND</span>
+                        <strong class="mono" id="liveTrendVal" style="font-size: 13px; color: var(--green);">{{ trend_15m }}</strong>
+                    </div>
+                    <div style="background: #090d16; padding: 10px; border-radius: 6px; border: 1px solid #1e293b;">
+                        <span style="font-size: 10px; color: var(--text-muted); display: block; font-weight: 600;">KAUFMAN KER</span>
+                        <strong class="mono" id="liveKerVal" style="font-size: 15px; color: #f59e0b;">{{ last_ker }}</strong>
+                    </div>
+                    <div style="background: #090d16; padding: 10px; border-radius: 6px; border: 1px solid #1e293b;">
+                        <span style="font-size: 10px; color: var(--text-muted); display: block; font-weight: 600;">ORB RANGE</span>
+                        <strong class="mono" id="liveOrbVal" style="font-size: 11px; color: var(--purple);">H: {{ orb_high }} | L: {{ orb_low }}</strong>
+                    </div>
+                </div>
+
                 <div class="signal-box">
                     <p class="signal-idle" id="signalStatusDesc">
                         🟢 <strong>Scanner Active &amp; Ready:</strong> Background worker is scanning 5-minute candles. Setup aate hi Telegram bot <strong>@nifty_signals_algo_bot</strong> par alert send karega.
@@ -692,7 +718,20 @@ DASHBOARD_HTML = """
             const res = await fetch('/health');
             const data = await res.json();
             if (data.today_trades !== undefined) {
-                document.getElementById('todayTradesVal').innerText = `${data.today_trades} / 1`;
+                document.getElementById('todayTradesVal').innerText = `${data.today_trades} / 1 Trade`;
+            }
+            if (data.spot) {
+                document.getElementById('liveSpotVal').innerText = `₹${data.spot}`;
+            }
+            if (data.trend_15m) {
+                document.getElementById('liveTrendVal').innerText = data.trend_15m;
+                document.getElementById('liveTrendVal').style.color = data.trend_15m === 'BULLISH' ? 'var(--green)' : 'var(--red)';
+            }
+            if (data.ker !== undefined) {
+                document.getElementById('liveKerVal').innerText = data.ker;
+            }
+            if (data.orb_high && data.orb_low) {
+                document.getElementById('liveOrbVal').innerText = `H: ${data.orb_high} | L: ${data.orb_low}`;
             }
         } catch(e) {}
     }
@@ -712,7 +751,12 @@ def index():
         current_ist=now_ist,
         last_scan_ist=scanner_status["last_scan_ist"] or "Waiting for first scan...",
         today_trades=scanner_status["today_trades"],
-        is_market_open=scanner_status["is_market_open"]
+        is_market_open=scanner_status["is_market_open"],
+        last_spot=scanner_status["last_spot"],
+        last_ker=scanner_status["last_ker"],
+        trend_15m=scanner_status["trend_15m"],
+        orb_high=scanner_status["orb_high"],
+        orb_low=scanner_status["orb_low"]
     )
 
 @app.route("/health")
@@ -721,7 +765,13 @@ def health():
         "status": "healthy",
         "service": "nifty_options_algo",
         "timestamp_ist": datetime.now(IST).isoformat(),
-        "today_trades": scanner_status["today_trades"]
+        "today_trades": scanner_status["today_trades"],
+        "spot": scanner_status["last_spot"],
+        "ker": scanner_status["last_ker"],
+        "trend_15m": scanner_status["trend_15m"],
+        "orb_high": scanner_status["orb_high"],
+        "orb_low": scanner_status["orb_low"],
+        "is_market_open": scanner_status["is_market_open"]
     }), 200
 
 @app.route("/api/scan")

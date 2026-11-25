@@ -42,21 +42,46 @@ class LiveSignalScanner:
             return None
 
         df_signals = self.strategy.generate_signals(df)
+        
+        # Professional Closed-Candle Rule: Ensure candle is fully closed to avoid mid-bar false wicks
+        import pytz
+        import pandas as pd
+        now_ist = datetime.now(pytz.timezone('Asia/Kolkata'))
         latest_candle = df_signals.iloc[-1]
-        candle_time = latest_candle.name
+        candle_end_time = latest_candle.name + pd.Timedelta(minutes=5)
+        
+        # If latest candle is still forming, evaluate the confirmed closed candle
+        if now_ist < candle_end_time and len(df_signals) > 1:
+            eval_candle = df_signals.iloc[-2]
+        else:
+            eval_candle = latest_candle
+
+        candle_time = eval_candle.name
 
         if self.last_scanned_candle == candle_time:
-            return None
+            return {
+                "candle_time": str(candle_time),
+                "spot": round(float(eval_candle['Close']), 2),
+                "ker": round(float(eval_candle.get('KER', 0.0)), 2),
+                "trend_15m": "BULLISH" if eval_candle.get('Trend_15M', 1) == 1 else "BEARISH",
+                "orb_high": round(float(eval_candle.get('ORB_High', 0.0)), 2),
+                "orb_low": round(float(eval_candle.get('ORB_Low', 0.0)), 2),
+                "signal": int(eval_candle.get('Signal', 0)),
+                "trade": None
+            }
 
         self.last_scanned_candle = candle_time
-        signal = latest_candle.get('Signal', 0)
-        atr = latest_candle.get('ATR', 25.0)
-        ker = latest_candle.get('KER', 0.0)
-        spot_price = latest_candle['Close']
-        trend_15m = "BULLISH" if latest_candle.get('Trend_15M', 1) == 1 else "BEARISH"
+        signal = eval_candle.get('Signal', 0)
+        atr = eval_candle.get('ATR', 25.0)
+        ker = eval_candle.get('KER', 0.0)
+        spot_price = eval_candle['Close']
+        trend_15m = "BULLISH" if eval_candle.get('Trend_15M', 1) == 1 else "BEARISH"
+        orb_high = round(float(eval_candle.get('ORB_High', 0.0)), 2)
+        orb_low = round(float(eval_candle.get('ORB_Low', 0.0)), 2)
 
         print(f"[Scanner {datetime.now().strftime('%H:%M:%S')}] Candle: {candle_time} | Spot: {spot_price:.2f} | 15m: {trend_15m} | KER: {ker:.2f} | Signal: {signal}")
 
+        trade_info = None
         if signal in [1, -1] and atr > 0:
             option_type = "CE" if signal == 1 else "PE"
             strike = self.pricing.get_atm_strike(spot_price, step=50)
@@ -85,7 +110,7 @@ class LiveSignalScanner:
             )
 
             self.today_trades_done += 1
-            return {
+            trade_info = {
                 "strike": strike,
                 "type": option_type,
                 "entry": entry_price,
@@ -93,7 +118,16 @@ class LiveSignalScanner:
                 "target": target_price
             }
 
-        return None
+        return {
+            "candle_time": str(candle_time),
+            "spot": round(float(spot_price), 2),
+            "ker": round(float(ker), 2),
+            "trend_15m": trend_15m,
+            "orb_high": orb_high,
+            "orb_low": orb_low,
+            "signal": int(signal),
+            "trade": trade_info
+        }
 
 if __name__ == "__main__":
     print("=" * 70)
