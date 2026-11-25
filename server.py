@@ -21,6 +21,35 @@ from telegram_notifier import AlertNotifier
 app = Flask(__name__)
 IST = pytz.timezone('Asia/Kolkata')
 
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "runtime_config.json")
+
+def load_runtime_config():
+    default_cfg = {
+        "initial_capital": 5000.0,
+        "lot_size": 25,
+        "max_trades_per_day": 1,
+        "max_daily_loss": 350.0,
+        "risk_reward_ratio": 2.0
+    }
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                saved = json.load(f)
+                default_cfg.update(saved)
+        except Exception:
+            pass
+    return default_cfg
+
+def save_runtime_config(cfg):
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(cfg, f, indent=4)
+        return True
+    except Exception:
+        return False
+
+current_user_config = load_runtime_config()
+
 scanner = None
 scanner_status = {
     "status": "Initializing...",
@@ -44,12 +73,18 @@ def is_market_open_now():
     return market_open <= now_ist <= market_close
 
 def background_scanner_thread():
-    global scanner, scanner_status
+    global scanner, scanner_status, current_user_config
     print("[Render Background Worker] Initializing Nifty Scanner...")
     time.sleep(5)
     
     try:
         scanner = LiveSignalScanner()
+        # Apply active user configuration
+        scanner.config.INITIAL_CAPITAL = float(current_user_config["initial_capital"])
+        scanner.config.LOT_SIZE = int(current_user_config["lot_size"])
+        scanner.config.MAX_TRADES_PER_DAY = int(current_user_config["max_trades_per_day"])
+        scanner.config.MAX_DAILY_LOSS = float(current_user_config["max_daily_loss"])
+        scanner.config.RISK_REWARD_RATIO = float(current_user_config["risk_reward_ratio"])
         scanner_status["status"] = "Active & Scanning"
     except Exception as e:
         scanner_status["status"] = f"Init Warning: {e}"
@@ -431,6 +466,29 @@ DASHBOARD_HTML = """
         .btn-secondary { background: #1e293b; color: var(--text-primary); border: 1px solid #334155; }
         .btn-secondary:hover { background: #334155; }
 
+        .btn-save { background: #059669; color: white; border: 1px solid #10b981; }
+        .btn-save:hover { background: #047857; transform: translateY(-1px); }
+
+        .setting-input {
+            width: 100%;
+            background: #090d16;
+            border: 1px solid #334155;
+            color: #f8fafc;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+            transition: all 0.2s;
+            box-sizing: border-box;
+        }
+
+        .setting-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+            background: #0d1527;
+        }
+
         /* TOAST */
         #toast {
             position: fixed;
@@ -499,8 +557,8 @@ DASHBOARD_HTML = """
     <div class="kpi-grid">
         <div class="kpi-card">
             <div class="kpi-label">💰 Initial Invested Capital</div>
-            <div class="kpi-value mono" style="color: var(--accent);">₹5,000.00</div>
-            <div class="kpi-sub">Target 1 Lot Nifty (25 Qty Strictly)</div>
+            <div class="kpi-value mono" id="liveCapitalVal" style="color: var(--accent);">₹{{ current_capital }}</div>
+            <div class="kpi-sub" id="liveQtySub">Target {{ current_qty }} Qty Strictly</div>
         </div>
 
         <div class="kpi-card" style="border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);">
@@ -511,8 +569,8 @@ DASHBOARD_HTML = """
 
         <div class="kpi-card">
             <div class="kpi-label">🏦 Total Account Value</div>
-            <div class="kpi-value mono" style="color: #38bdf8;" id="liveAccountVal">₹5,000.00</div>
-            <div class="kpi-sub">₹5,000 Starting Balance</div>
+            <div class="kpi-value mono" style="color: #38bdf8;" id="liveAccountVal">₹{{ current_capital }}</div>
+            <div class="kpi-sub">Starting Active Balance</div>
         </div>
 
         <div class="kpi-card">
@@ -529,8 +587,8 @@ DASHBOARD_HTML = """
 
         <div class="kpi-card">
             <div class="kpi-label">🛡️ Today's Status &amp; Risk Guard</div>
-            <div class="kpi-value mono" style="color: var(--purple);" id="todayTradesVal">{{ today_trades }} / 1 Trade</div>
-            <div class="kpi-sub">₹350 Daily Max Loss Kill-Switch</div>
+            <div class="kpi-value mono" style="color: var(--purple);" id="todayTradesVal">{{ today_trades }} / {{ current_trades }} Trade</div>
+            <div class="kpi-sub" id="liveKillSwitchSub">₹{{ current_loss }} Daily Max Loss Kill-Switch</div>
         </div>
     </div>
 
@@ -626,11 +684,66 @@ DASHBOARD_HTML = """
                 </button>
             </div>
 
-            <div style="background: #0f172a; border-radius: 8px; padding: 14px; border: 1px solid var(--border-color); font-size: 12px;">
+            <div style="background: #0f172a; border-radius: 8px; padding: 14px; border: 1px solid var(--border-color); font-size: 12px; margin-bottom: 20px;">
                 <strong style="color: var(--text-primary); display: block; margin-bottom: 6px;">📱 Groww Execution Rule:</strong>
                 <span style="color: var(--text-secondary); line-height: 1.5; display: block;">
-                    Alert aate hi Groww mein 1 Lot punch karein. Stop-loss aur target alert mein likhe points ke according limit order mein daal dein.
+                    Alert aate hi Groww mein buy punch karein. Stop-loss aur target alert mein likhe points ke according daal dein.
                 </span>
+            </div>
+
+            <!-- DYNAMIC ALGO SETTINGS CARD -->
+            <div style="padding-top: 18px; border-top: 1px solid var(--border-color);">
+                <div class="panel-header" style="margin-bottom: 14px; padding-bottom: 8px;">
+                    <div class="panel-title" style="font-size: 14px;">⚙️ Live Algo Settings &amp; Risk Controls</div>
+                    <span class="tag tag-blue">Real-Time Config</span>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; text-align: left; font-size: 12px;">
+                    <div>
+                        <label style="color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 500;">
+                            💰 Active Capital (₹):
+                        </label>
+                        <input type="number" id="inputCapital" value="{{ current_capital }}" class="setting-input" step="500">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 500;">
+                                📦 Order Quantity:
+                            </label>
+                            <input type="number" id="inputQty" value="{{ current_qty }}" class="setting-input" step="25" min="25">
+                            <span style="font-size: 10px; color: var(--text-muted);">1 Lot = 25 Qty</span>
+                        </div>
+                        <div>
+                            <label style="color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 500;">
+                                🎯 Max Trades/Day:
+                            </label>
+                            <input type="number" id="inputTrades" value="{{ current_trades }}" class="setting-input" min="1" max="5">
+                            <span style="font-size: 10px; color: var(--text-muted);">Default: 1 Trade</span>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 500;">
+                                🛑 Max Daily Loss (₹):
+                            </label>
+                            <input type="number" id="inputLoss" value="{{ current_loss }}" class="setting-input" step="50">
+                            <span style="font-size: 10px; color: var(--text-muted);">Kill-Switch Limit</span>
+                        </div>
+                        <div>
+                            <label style="color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 500;">
+                                ⚖️ Risk-Reward (1:X):
+                            </label>
+                            <input type="number" id="inputRR" value="{{ current_rr }}" class="setting-input" step="0.5" min="1.0">
+                            <span style="font-size: 10px; color: var(--text-muted);">1:2 Asymmetric</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-save" onclick="saveSettingsLive()" style="margin-top: 8px;">
+                        💾 Save &amp; Apply Settings Live
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -751,13 +864,54 @@ DASHBOARD_HTML = """
         }
     }
 
+    async function saveSettingsLive() {
+        const capital = parseFloat(document.getElementById('inputCapital').value);
+        const qty = parseInt(document.getElementById('inputQty').value);
+        const trades = parseInt(document.getElementById('inputTrades').value);
+        const loss = parseFloat(document.getElementById('inputLoss').value);
+        const rr = parseFloat(document.getElementById('inputRR').value);
+
+        if (isNaN(capital) || isNaN(qty) || isNaN(trades) || isNaN(loss) || isNaN(rr)) {
+            showToast("⚠️ Please enter valid numeric values!");
+            return;
+        }
+
+        showToast("Saving new settings...");
+        try {
+            const res = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    initial_capital: capital,
+                    lot_size: qty,
+                    max_trades_per_day: trades,
+                    max_daily_loss: loss,
+                    risk_reward_ratio: rr
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast("✅ Settings applied live!");
+                document.getElementById('liveCapitalVal').innerText = `₹${capital.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+                document.getElementById('liveAccountVal').innerText = `₹${capital.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+                document.getElementById('liveQtySub').innerText = `Target ${qty} Qty Strictly`;
+                document.getElementById('liveKillSwitchSub').innerText = `₹${loss} Daily Max Loss Kill-Switch`;
+                document.getElementById('todayTradesVal').innerText = `0 / ${trades} Trade`;
+            } else {
+                showToast(`❌ Error: ${data.error}`);
+            }
+        } catch(e) {
+            showToast("❌ Failed to save settings");
+        }
+    }
+
     // Auto-refresh stats every 8 seconds
     async function refreshStatus() {
         try {
             const res = await fetch('/health');
             const data = await res.json();
-            if (data.today_trades !== undefined) {
-                document.getElementById('todayTradesVal').innerText = `${data.today_trades} / 1 Trade`;
+            if (data.today_trades !== undefined && data.max_trades !== undefined) {
+                document.getElementById('todayTradesVal').innerText = `${data.today_trades} / ${data.max_trades} Trade`;
             }
             if (data.spot) {
                 document.getElementById('liveSpotVal').innerText = `₹${data.spot}`;
@@ -795,7 +949,12 @@ def index():
         last_ker=scanner_status["last_ker"],
         trend_15m=scanner_status["trend_15m"],
         orb_high=scanner_status["orb_high"],
-        orb_low=scanner_status["orb_low"]
+        orb_low=scanner_status["orb_low"],
+        current_capital=f"{current_user_config['initial_capital']:,.2f}",
+        current_qty=current_user_config['lot_size'],
+        current_trades=current_user_config['max_trades_per_day'],
+        current_loss=f"{current_user_config['max_daily_loss']:,.2f}",
+        current_rr=current_user_config['risk_reward_ratio']
     )
 
 @app.route("/health")
@@ -805,6 +964,7 @@ def health():
         "service": "nifty_options_algo",
         "timestamp_ist": datetime.now(IST).isoformat(),
         "today_trades": scanner_status["today_trades"],
+        "max_trades": current_user_config["max_trades_per_day"],
         "spot": scanner_status["last_spot"],
         "ker": scanner_status["last_ker"],
         "trend_15m": scanner_status["trend_15m"],
@@ -812,6 +972,45 @@ def health():
         "orb_low": scanner_status["orb_low"],
         "is_market_open": scanner_status["is_market_open"]
     }), 200
+
+@app.route("/api/settings", methods=["GET", "POST"])
+def api_settings():
+    global current_user_config, scanner
+    if request.method == "POST":
+        try:
+            data = request.get_json() or {}
+            cap = float(data.get("initial_capital", current_user_config["initial_capital"]))
+            qty = int(data.get("lot_size", current_user_config["lot_size"]))
+            trades = int(data.get("max_trades_per_day", current_user_config["max_trades_per_day"]))
+            loss = float(data.get("max_daily_loss", current_user_config["max_daily_loss"]))
+            rr = float(data.get("risk_reward_ratio", current_user_config["risk_reward_ratio"]))
+
+            if cap < 1000 or qty < 1 or trades < 1 or loss < 100:
+                return jsonify({"success": False, "error": "Invalid values provided"}), 400
+
+            current_user_config["initial_capital"] = cap
+            current_user_config["lot_size"] = qty
+            current_user_config["max_trades_per_day"] = trades
+            current_user_config["max_daily_loss"] = loss
+            current_user_config["risk_reward_ratio"] = rr
+            save_runtime_config(current_user_config)
+
+            if scanner:
+                scanner.config.INITIAL_CAPITAL = cap
+                scanner.config.LOT_SIZE = qty
+                scanner.config.MAX_TRADES_PER_DAY = trades
+                scanner.config.MAX_DAILY_LOSS = loss
+                scanner.config.RISK_REWARD_RATIO = rr
+
+            return jsonify({
+                "success": True,
+                "message": f"Settings saved! Capital: ₹{cap:,.2f}, Qty: {qty}, Max Trades: {trades}/day",
+                "settings": current_user_config
+            }), 200
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+    else:
+        return jsonify(current_user_config), 200
 
 @app.route("/api/scan")
 def api_scan():
