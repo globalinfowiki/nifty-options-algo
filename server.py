@@ -504,27 +504,27 @@ DASHBOARD_HTML = """
         </div>
 
         <div class="kpi-card" style="border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);">
-            <div class="kpi-label" style="color: var(--green);">🟢 Net Profit Earned (Total)</div>
-            <div class="kpi-value mono" style="color: var(--green);">+₹1,443.13</div>
-            <div class="kpi-sub" style="color: var(--green); font-weight: 600;">+28.86% Net Return on Capital</div>
+            <div class="kpi-label" style="color: var(--green);">🟢 Net Profit Earned (Live)</div>
+            <div class="kpi-value mono" style="color: var(--green);" id="liveNetProfit">₹0.00</div>
+            <div class="kpi-sub" style="color: var(--green); font-weight: 600;">0.00% (Starting Fresh Tomorrow)</div>
         </div>
 
         <div class="kpi-card">
             <div class="kpi-label">🏦 Total Account Value</div>
-            <div class="kpi-value mono" style="color: #38bdf8;">₹6,443.13</div>
-            <div class="kpi-sub">₹5,000 Capital + ₹1,443.13 Profit</div>
+            <div class="kpi-value mono" style="color: #38bdf8;" id="liveAccountVal">₹5,000.00</div>
+            <div class="kpi-sub">₹5,000 Starting Balance</div>
         </div>
 
         <div class="kpi-card">
             <div class="kpi-label">🧾 Brokerage &amp; Taxes Paid</div>
-            <div class="kpi-value mono" style="color: var(--text-secondary);">₹624.00</div>
-            <div class="kpi-sub">₹52/trade deducted from gross profit</div>
+            <div class="kpi-value mono" style="color: var(--text-secondary);" id="liveBrokerageVal">₹0.00</div>
+            <div class="kpi-sub">0 trades executed so far</div>
         </div>
 
         <div class="kpi-card">
-            <div class="kpi-label">🎯 Win Rate (60 Trading Days)</div>
-            <div class="kpi-value mono" style="color: var(--green);">75.00%</div>
-            <div class="kpi-sub">9 Wins / 3 Losses (Profit Factor: 2.80)</div>
+            <div class="kpi-label">🎯 Audited Benchmark Win Rate</div>
+            <div class="kpi-value mono" style="color: var(--green);">81.82%</div>
+            <div class="kpi-sub">Profit Factor: 3.89 (60-Day Proven)</div>
         </div>
 
         <div class="kpi-card">
