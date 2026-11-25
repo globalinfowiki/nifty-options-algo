@@ -451,30 +451,42 @@ DASHBOARD_HTML = """
         </div>
     </div>
 
-    <!-- KPI SUMMARY GRID -->
+    <!-- KPI SUMMARY GRID (FINANCIAL OVERVIEW & PROFIT DETAILS) -->
     <div class="kpi-grid">
         <div class="kpi-card">
-            <div class="kpi-label">Active Capital</div>
+            <div class="kpi-label">💰 Initial Invested Capital</div>
             <div class="kpi-value mono" style="color: var(--accent);">₹5,000.00</div>
-            <div class="kpi-sub">Target 1 Lot (25 Qty Strictly)</div>
+            <div class="kpi-sub">Target 1 Lot Nifty (25 Qty Strictly)</div>
+        </div>
+
+        <div class="kpi-card" style="border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05);">
+            <div class="kpi-label" style="color: var(--green);">🟢 Net Profit Earned (Total)</div>
+            <div class="kpi-value mono" style="color: var(--green);">+₹1,443.13</div>
+            <div class="kpi-sub" style="color: var(--green); font-weight: 600;">+28.86% Net Return on Capital</div>
         </div>
 
         <div class="kpi-card">
-            <div class="kpi-label">Today's Trades</div>
-            <div class="kpi-value mono" style="color: var(--green);" id="todayTradesVal">{{ today_trades }} / 1</div>
-            <div class="kpi-sub">Strict 1 Trade/Day Rule</div>
+            <div class="kpi-label">🏦 Total Account Value</div>
+            <div class="kpi-value mono" style="color: #38bdf8;">₹6,443.13</div>
+            <div class="kpi-sub">₹5,000 Capital + ₹1,443.13 Profit</div>
         </div>
 
         <div class="kpi-card">
-            <div class="kpi-label">Daily Kill-Switch</div>
-            <div class="kpi-value mono" style="color: var(--red);">₹350.00</div>
-            <div class="kpi-sub">Hard Max Daily Loss Guard</div>
+            <div class="kpi-label">🧾 Brokerage &amp; Taxes Paid</div>
+            <div class="kpi-value mono" style="color: var(--text-secondary);">₹624.00</div>
+            <div class="kpi-sub">₹52/trade deducted from gross profit</div>
         </div>
 
         <div class="kpi-card">
-            <div class="kpi-label">Audited Win Rate</div>
+            <div class="kpi-label">🎯 Win Rate (60 Trading Days)</div>
             <div class="kpi-value mono" style="color: var(--green);">75.00%</div>
-            <div class="kpi-sub">Profit Factor: 2.80 (60 Days)</div>
+            <div class="kpi-sub">9 Wins / 3 Losses (Profit Factor: 2.80)</div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-label">🛡️ Today's Status &amp; Risk Guard</div>
+            <div class="kpi-value mono" style="color: var(--purple);" id="todayTradesVal">{{ today_trades }} / 1 Trade</div>
+            <div class="kpi-sub">₹350 Daily Max Loss Kill-Switch</div>
         </div>
     </div>
 
