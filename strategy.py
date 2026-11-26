@@ -71,31 +71,37 @@ class MomentumOptionStrategy:
         return df
 
     def _calculate_supertrend(self, df: pd.DataFrame, period=10, multiplier=2.0) -> pd.DataFrame:
+        high_low = df['High'] - df['Low']
+        high_close = (df['High'] - df['Close'].shift()).abs()
+        low_close = (df['Low'] - df['Close'].shift()).abs()
+        tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+        atr = tr.rolling(window=period).mean()
+
         hl2 = (df['High'] + df['Low']) / 2.0
-        df['Upper_Basic'] = hl2 + (multiplier * df['ATR'])
-        df['Lower_Basic'] = hl2 - (multiplier * df['ATR'])
-        
-        upper_band = [0.0] * len(df)
-        lower_band = [0.0] * len(df)
-        trend = [1] * len(df)
+        upper_basic = (hl2 + (multiplier * atr)).bfill()
+        lower_basic = (hl2 - (multiplier * atr)).bfill()
+
+        upper_band = upper_basic.copy()
+        lower_band = lower_basic.copy()
+        trend = pd.Series(1, index=df.index)
 
         for i in range(1, len(df)):
-            if df['Upper_Basic'].iloc[i] < upper_band[i-1] or df['Close'].iloc[i-1] > upper_band[i-1]:
-                upper_band[i] = df['Upper_Basic'].iloc[i]
+            if df['Close'].iloc[i-1] <= upper_band.iloc[i-1]:
+                upper_band.iloc[i] = min(upper_basic.iloc[i], upper_band.iloc[i-1])
             else:
-                upper_band[i] = upper_band[i-1]
+                upper_band.iloc[i] = upper_basic.iloc[i]
 
-            if df['Lower_Basic'].iloc[i] > lower_band[i-1] or df['Close'].iloc[i-1] < lower_band[i-1]:
-                lower_band[i] = df['Lower_Basic'].iloc[i]
+            if df['Close'].iloc[i-1] >= lower_band.iloc[i-1]:
+                lower_band.iloc[i] = max(lower_basic.iloc[i], lower_band.iloc[i-1])
             else:
-                lower_band[i] = lower_band[i-1]
+                lower_band.iloc[i] = lower_basic.iloc[i]
 
-            if df['Close'].iloc[i] > upper_band[i-1]:
-                trend[i] = 1
-            elif df['Close'].iloc[i] < lower_band[i-1]:
-                trend[i] = -1
+            if df['Close'].iloc[i] > upper_band.iloc[i-1]:
+                trend.iloc[i] = 1
+            elif df['Close'].iloc[i] < lower_band.iloc[i-1]:
+                trend.iloc[i] = -1
             else:
-                trend[i] = trend[i-1]
+                trend.iloc[i] = trend.iloc[i-1]
 
         df['SuperTrend_Upper'] = upper_band
         df['SuperTrend_Lower'] = lower_band
