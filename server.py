@@ -114,14 +114,17 @@ def background_scanner_thread():
             if now_ist.weekday() < 5 and now_ist.hour == 9 and 10 <= now_ist.minute <= 14 and premarket_sent_date != current_date:
                 try:
                     notifier = AlertNotifier()
+                    mode_label = current_user_config.get("trading_mode", "balanced").upper()
+                    lots = max(1, current_user_config.get("lot_size", 25) // 25)
+                    lot_text = f"{lots} Lot" if lots == 1 else f"{lots} Lots"
                     notifier.send_telegram_message(
                         "🌅 *PRE-MARKET WAKEUP: ALGO PRIMED & READY!*\n"
                         "━━━━━━━━━━━━━━━━━━━━\n"
                         "⏰ *Time:* 09:10 AM IST\n"
                         "🏛️ *NSE Market:* Opens at 09:15 AM\n"
-                        "🎯 *Rules:* Kaufman KER (>0.38) + 15m ORB\n"
-                        "📦 *Discipline:* Strictly 1 Lot | Max 1 Trade\n"
-                        "🛡️ *Kill-Switch:* ₹350 Max Loss Guard Active\n"
+                        f"⚡ *Mode:* {mode_label} (Active Momentum)\n"
+                        f"📦 *Discipline:* Strictly {lot_text} | Max {current_user_config.get('max_trades_per_day', 1)} Trade\n"
+                        f"🛡️ *Kill-Switch:* ₹{current_user_config.get('max_daily_loss', 350):.0f} Max Loss Guard Active\n"
                         "━━━━━━━━━━━━━━━━━━━━\n"
                         "Cloud scanner is active. Stay disciplined today! 🚀"
                     )
@@ -134,11 +137,12 @@ def background_scanner_thread():
                 try:
                     notifier = AlertNotifier()
                     trades_done = scanner_status["today_trades"]
+                    max_trades = current_user_config.get("max_trades_per_day", 1)
                     notifier.send_telegram_message(
                         "🏁 *DAILY MARKET WRAP (NSE CLOSED)*\n"
                         "━━━━━━━━━━━━━━━━━━━━\n"
                         "⏰ *Time:* 03:35 PM IST\n"
-                        f"📊 *Today Trades Taken:* {trades_done} / 1\n"
+                        f"📊 *Today Trades Taken:* {trades_done} / {max_trades}\n"
                         f"📈 *Nifty Close Reference:* ₹{scanner_status['last_spot']}\n"
                         "━━━━━━━━━━━━━━━━━━━━\n"
                         "Session finished. Scanner resting until tomorrow 09:15 AM! 🛌"

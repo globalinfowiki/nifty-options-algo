@@ -56,6 +56,9 @@ class AlertNotifier:
         reward_per_lot = round(target_pts * qty, 2)
         now_str = datetime.now().strftime("%I:%M %p | %d-%b-%Y")
 
+        lots = max(1, qty // 25)
+        lot_label = f"{lots} Lot" if lots == 1 else f"{lots} Lots"
+
         # 1. Play Audio Alarm
         self.play_sound("entry")
 
@@ -67,7 +70,7 @@ class AlertNotifier:
 ║  ⏰ Time        : {now_str:<46} ║
 ║  📌 Action      : BUY {option_type:<41} ║
 ║  🎯 Strike      : {symbol} {strike} {option_type:<32} ║
-║  📦 Quantity    : {qty} Qty (1 Lot Strictly)                           ║
+║  📦 Quantity    : {qty} Qty ({lot_label:<10})                         ║
 ║  💵 Est. Price  : ₹{entry_price:<44.2f} ║
 ║  🛑 Stop-Loss   : ₹{sl_price:<7.2f} (-{sl_pts:.1f} pts | Risk: ₹{risk_per_lot:<12.2f}) ║
 ║  🎯 Target 1:2  : ₹{target_price:<7.2f} (+{target_pts:.1f} pts | Gain: ₹{reward_per_lot:<12.2f}) ║
@@ -83,7 +86,7 @@ class AlertNotifier:
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"📌 *Action:* BUY `{option_type}`\n"
             f"🎯 *Strike:* `{symbol} {strike} {option_type}`\n"
-            f"📦 *Quantity:* `{qty} (1 Lot)`\n"
+            f"📦 *Quantity:* `{qty} ({lot_label})`\n"
             f"💵 *Est. Entry:* `₹{entry_price:.2f}`\n"
             f"🛑 *Stop-Loss:* `₹{sl_price:.2f}` _(-{sl_pts:.1f} pts | Risk: ₹{risk_per_lot:.0f})_\n"
             f"🎯 *Target (1:2):* `₹{target_price:.2f}` _(+{target_pts:.1f} pts | Reward: ₹{reward_per_lot:.0f})_\n"
