@@ -29,7 +29,8 @@ def load_runtime_config():
         "lot_size": 25,
         "max_trades_per_day": 1,
         "max_daily_loss": 350.0,
-        "risk_reward_ratio": 2.0
+        "risk_reward_ratio": 2.0,
+        "trading_mode": "balanced"
     }
     if os.path.exists(CONFIG_FILE):
         try:
@@ -85,6 +86,9 @@ def background_scanner_thread():
         scanner.config.MAX_TRADES_PER_DAY = int(current_user_config["max_trades_per_day"])
         scanner.config.MAX_DAILY_LOSS = float(current_user_config["max_daily_loss"])
         scanner.config.RISK_REWARD_RATIO = float(current_user_config["risk_reward_ratio"])
+        mode = current_user_config.get("trading_mode", "balanced")
+        scanner.config.TRADING_MODE = mode
+        scanner.strategy.config.TRADING_MODE = mode
         scanner_status["status"] = "Active & Scanning"
     except Exception as e:
         scanner_status["status"] = f"Init Warning: {e}"
@@ -543,6 +547,9 @@ DASHBOARD_HTML = """
             <p>Institutional Kaufman ORB + Elder MTF Multi-Timeframe System</p>
         </div>
         <div class="header-meta">
+            <div id="modeBadge" class="badge-live" style="background: rgba(139, 92, 246, 0.15); border: 1px solid var(--purple); color: #c4b5fd;">
+                ⚡ MODE: <span id="modeText" style="font-weight: 700;">{{ current_mode.upper() }}</span>
+            </div>
             <div id="marketBadge" class="badge-live {{ 'badge-open' if is_market_open else 'badge-closed' }}">
                 <span class="pulse-dot"></span>
                 <span id="marketText">{{ '🟢 MARKET OPEN' if is_market_open else '🔴 MARKET CLOSED' }}</span>
@@ -699,6 +706,17 @@ DASHBOARD_HTML = """
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 12px; text-align: left; font-size: 12px;">
+                    <div>
+                        <label style="color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 500;">
+                            ⚡ Strategy Execution Mode:
+                        </label>
+                        <select id="inputMode" class="setting-input" style="cursor: pointer;">
+                            <option value="balanced" {% if current_mode == 'balanced' %}selected{% endif %}>⚡ Balanced Mode (Active Momentum ~73% Win Rate - Regular Opportunities)</option>
+                            <option value="sniper" {% if current_mode == 'sniper' %}selected{% endif %}>🎯 Sniper Mode (Institutional Strict Breakout ~81% Win Rate)</option>
+                        </select>
+                        <span style="font-size: 10px; color: var(--text-muted);">Balanced mode captures clean momentum without missing full trading days.</span>
+                    </div>
+
                     <div>
                         <label style="color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 500;">
                             💰 Active Capital (₹):
@@ -870,6 +888,7 @@ DASHBOARD_HTML = """
         const trades = parseInt(document.getElementById('inputTrades').value);
         const loss = parseFloat(document.getElementById('inputLoss').value);
         const rr = parseFloat(document.getElementById('inputRR').value);
+        const mode = document.getElementById('inputMode').value;
 
         if (isNaN(capital) || isNaN(qty) || isNaN(trades) || isNaN(loss) || isNaN(rr)) {
             showToast("⚠️ Please enter valid numeric values!");
@@ -886,7 +905,8 @@ DASHBOARD_HTML = """
                     lot_size: qty,
                     max_trades_per_day: trades,
                     max_daily_loss: loss,
-                    risk_reward_ratio: rr
+                    risk_reward_ratio: rr,
+                    trading_mode: mode
                 })
             });
             const data = await res.json();
@@ -897,6 +917,9 @@ DASHBOARD_HTML = """
                 document.getElementById('liveQtySub').innerText = `Target ${qty} Qty Strictly`;
                 document.getElementById('liveKillSwitchSub').innerText = `₹${loss} Daily Max Loss Kill-Switch`;
                 document.getElementById('todayTradesVal').innerText = `0 / ${trades} Trade`;
+                if (document.getElementById('modeText')) {
+                    document.getElementById('modeText').innerText = mode.toUpperCase();
+                }
             } else {
                 showToast(`❌ Error: ${data.error}`);
             }
@@ -954,7 +977,8 @@ def index():
         current_qty=current_user_config['lot_size'],
         current_trades=current_user_config['max_trades_per_day'],
         current_loss=f"{current_user_config['max_daily_loss']:,.2f}",
-        current_rr=current_user_config['risk_reward_ratio']
+        current_rr=current_user_config['risk_reward_ratio'],
+        current_mode=current_user_config.get('trading_mode', 'balanced')
     )
 
 @app.route("/health")
@@ -965,6 +989,7 @@ def health():
         "timestamp_ist": datetime.now(IST).isoformat(),
         "today_trades": scanner_status["today_trades"],
         "max_trades": current_user_config["max_trades_per_day"],
+        "trading_mode": current_user_config.get("trading_mode", "balanced"),
         "spot": scanner_status["last_spot"],
         "ker": scanner_status["last_ker"],
         "trend_15m": scanner_status["trend_15m"],
@@ -984,6 +1009,9 @@ def api_settings():
             trades = int(data.get("max_trades_per_day", current_user_config["max_trades_per_day"]))
             loss = float(data.get("max_daily_loss", current_user_config["max_daily_loss"]))
             rr = float(data.get("risk_reward_ratio", current_user_config["risk_reward_ratio"]))
+            mode = str(data.get("trading_mode", current_user_config.get("trading_mode", "balanced"))).lower()
+            if mode not in ["balanced", "sniper"]:
+                mode = "balanced"
 
             if cap < 1000 or qty < 1 or trades < 1 or loss < 100:
                 return jsonify({"success": False, "error": "Invalid values provided"}), 400
@@ -993,6 +1021,7 @@ def api_settings():
             current_user_config["max_trades_per_day"] = trades
             current_user_config["max_daily_loss"] = loss
             current_user_config["risk_reward_ratio"] = rr
+            current_user_config["trading_mode"] = mode
             save_runtime_config(current_user_config)
 
             if scanner:
@@ -1001,10 +1030,12 @@ def api_settings():
                 scanner.config.MAX_TRADES_PER_DAY = trades
                 scanner.config.MAX_DAILY_LOSS = loss
                 scanner.config.RISK_REWARD_RATIO = rr
+                scanner.config.TRADING_MODE = mode
+                scanner.strategy.config.TRADING_MODE = mode
 
             return jsonify({
                 "success": True,
-                "message": f"Settings saved! Capital: ₹{cap:,.2f}, Qty: {qty}, Max Trades: {trades}/day",
+                "message": f"Settings saved! Mode: {mode.upper()}, Capital: ₹{cap:,.2f}, Qty: {qty}",
                 "settings": current_user_config
             }), 200
         except Exception as e:

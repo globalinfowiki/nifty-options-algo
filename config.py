@@ -25,6 +25,8 @@ class TradingConfig:
     ADX_PERIOD: int = 14
     ADX_THRESHOLD: float = 22.0
     ATR_PERIOD: int = 14
+    TRADING_MODE: str = "balanced"    # 'balanced' (Active Momentum) or 'sniper' (Strict Breakout)
+    KER_THRESHOLD: float = 0.22       # 0.22 for balanced, 0.38 for sniper
     
     # Risk Management & Kill-Switch for ₹5,000 Capital
     RISK_REWARD_RATIO: float = 2.0    # 1:2 R:R strictly
