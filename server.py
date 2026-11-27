@@ -96,6 +96,7 @@ def background_scanner_thread():
 
     last_scan_date = None
     premarket_sent_date = None
+    orb_sent_date = None
     wrap_sent_date = None
 
     while True:
@@ -132,7 +133,29 @@ def background_scanner_thread():
                 except Exception as ex:
                     print(f"[Pre-market Alert Error] {ex}")
 
-            # 2. Automated Market Wrap Ping (15:35 PM Mon-Fri)
+            # 2. Automated Opening Range Ready Ping (09:31 AM Mon-Fri)
+            if now_ist.weekday() < 5 and now_ist.hour == 9 and 31 <= now_ist.minute <= 36 and orb_sent_date != current_date:
+                try:
+                    notifier = AlertNotifier()
+                    orb_h = scanner_status.get('orb_high', 0.0)
+                    orb_l = scanner_status.get('orb_low', 0.0)
+                    trend = scanner_status.get('trend_15m', 'NEUTRAL')
+                    notifier.send_telegram_message(
+                        "🎯 *OPENING RANGE READY (09:30 AM)*\n"
+                        "━━━━━━━━━━━━━━━━━━━━\n"
+                        "⏰ *Time:* 09:31 AM IST\n"
+                        f"📈 *ORB High:* ₹{orb_h:,.2f}\n"
+                        f"📉 *ORB Low:* ₹{orb_l:,.2f}\n"
+                        f"📊 *15m Trend:* {trend}\n"
+                        "⚡ *Mode:* BALANCED (Targeting 40-50 pts momentum)\n"
+                        "━━━━━━━━━━━━━━━━━━━━\n"
+                        "Scanner active! Waiting for 5-min confirmed breakout. Stay tuned! 🔔"
+                    )
+                    orb_sent_date = current_date
+                except Exception as ex:
+                    print(f"[ORB Alert Error] {ex}")
+
+            # 3. Automated Market Wrap Ping (15:35 PM Mon-Fri)
             if now_ist.weekday() < 5 and now_ist.hour == 15 and 35 <= now_ist.minute <= 40 and wrap_sent_date != current_date:
                 try:
                     notifier = AlertNotifier()
