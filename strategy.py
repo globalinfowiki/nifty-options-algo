@@ -117,8 +117,9 @@ class MomentumOptionStrategy:
             'Volume': 'sum'
         }).dropna()
 
-        ema_15_fast = df_15['Close'].ewm(span=20, adjust=False).mean()
-        ema_15_slow = df_15['Close'].ewm(span=50, adjust=False).mean()
+        # Responsive Fibonacci EMA (13/34) to avoid lagging behind morning breakout moves
+        ema_15_fast = df_15['Close'].ewm(span=13, adjust=False).mean()
+        ema_15_slow = df_15['Close'].ewm(span=34, adjust=False).mean()
         trend_15m = np.where(ema_15_fast >= ema_15_slow, 1, -1)
         s_trend_15m = pd.Series(trend_15m, index=df_15.index)
 
