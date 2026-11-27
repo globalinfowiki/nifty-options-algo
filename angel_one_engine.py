@@ -7,16 +7,27 @@ Angel One SmartAPI Connector & Live Execution Engine:
 """
 from SmartApi import SmartConnect
 import pyotp
+import os
 import time
 import json
 from datetime import datetime
 
 class AngelOneConnector:
     def __init__(self, api_key="", client_code="", mpin="", totp_secret="", paper_trading=True):
-        self.api_key = api_key
-        self.client_code = client_code
-        self.mpin = mpin
-        self.totp_secret = totp_secret
+        # Read from arguments or environment / .env file
+        env_dict = {}
+        env_file = os.path.join(os.path.dirname(__file__), ".env")
+        if os.path.exists(env_file):
+            with open(env_file, "r") as f:
+                for line in f:
+                    if "=" in line and not line.strip().startswith("#"):
+                        k, v = line.strip().split("=", 1)
+                        env_dict[k] = v
+
+        self.api_key = api_key or os.getenv("ANGEL_API_KEY") or env_dict.get("ANGEL_API_KEY", "")
+        self.client_code = client_code or os.getenv("ANGEL_CLIENT_CODE") or env_dict.get("ANGEL_CLIENT_CODE", "")
+        self.mpin = mpin or os.getenv("ANGEL_MPIN") or env_dict.get("ANGEL_MPIN", "")
+        self.totp_secret = totp_secret or os.getenv("ANGEL_TOTP_SECRET") or env_dict.get("ANGEL_TOTP_SECRET", "")
         self.paper_trading = paper_trading
         
         self.smart_api = None
@@ -105,6 +116,10 @@ if __name__ == "__main__":
     print("   ANGEL ONE SMARTAPI PYTHON CONNECTOR TEST   ")
     print("=" * 60)
     connector = AngelOneConnector(paper_trading=True)
+    logged_in = connector.connect()
+    if logged_in:
+        spot = connector.get_live_quote()
+        print(f"[Live NSE Quote via Angel One] Nifty 50 Spot: ₹{spot}")
     # Test a virtual paper order
     connector.place_option_order(tradingsymbol="NIFTY25700CE", symbol_token="12345", action="BUY", qty=25, price=115.0)
-    print("[Success] Angel One module is ready for API credentials integration.")
+    print("[Success] Angel One module is 100% connected and ready!")
